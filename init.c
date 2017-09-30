@@ -1,4 +1,5 @@
 #define _GNU_SOURCE         /* See feature_test_macros(7) */
+#define _FILE_OFFSET_BITS 64
 #include <unistd.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -22,7 +23,7 @@ static void setup_stdio(void) {
 int main(void) {
 
   const char* sysroot = "/sysroot";
-  const char* sysdev = "/dev/sda1";
+  const char* sysdev = "/dev/sda2";
 
   const char* looproot = "/sysloop";
   const char* loopdev = "/dev/loop0";
@@ -42,18 +43,22 @@ int main(void) {
 	perror("chdir sysroot");
   }
 
-  int fd_root_img = open("fedora/rootfs.img", O_RDWR);
-  if (rc == -1) {
+  int fd_root_img = open("/sysroot/fedora/rootfs.img", O_RDWR);
+  if (fd_root_img == -1) {
 	perror("open rootfs.img");
   }
 
   int fd_loop = open(loopdev, O_RDWR);
-  if (rc == -1) {
+  if (fd_loop == -1) {
 	perror("open loopdev");
   }
   rc = ioctl(fd_loop, LOOP_SET_FD, fd_root_img);
   if (rc == -1) {
 	perror("ioctl loopdev");
+  }
+  rc = close(fd_loop);
+  if (rc == -1) {
+	perror("close loopdev");
   }
 
   // mount loop device
@@ -83,5 +88,32 @@ int main(void) {
   execl("/sbin/init", "/sbin/init", (char*) NULL);
 
   // unmount loop
-  //rc = umount();
+  rc = umount(loopdev);
+  if (rc == -1) {
+	perror("umount loopdev");
+  }
+
+  fd_loop = open(loopdev, O_RDWR);
+  if (fd_loop == -1) {
+	perror("open loopdev");
+  }
+  rc = ioctl(fd_loop, LOOP_CLR_FD, fd_root_img);
+  if (rc == -1) {
+	perror("ioctl loopdev");
+  }
+  rc = close(fd_loop);
+  if (rc == -1) {
+	perror("close loopdev");
+  }
+
+  rc = close(fd_root_img);
+  if (rc == -1) {
+	perror("close root img");
+  }
+
+  rc = umount(sysroot);
+  if (rc == -1) {
+	perror("umount sysroot");
+  }
+
 }
